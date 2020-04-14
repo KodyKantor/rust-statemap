@@ -74,6 +74,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2439c63f3f6139d1b57529d16bc3b8bb855230c8efcc5d3a896c8bea7c3b1e84"
 
 [[package]]
+name = "rust-statemap"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -108,16 +118,6 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
-]
-
-[[package]]
-name = "statemap-rs"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "serde",
- "serde_derive",
- "serde_json",
 ]
 
 [[package]]

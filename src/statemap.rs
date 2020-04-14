@@ -4,7 +4,7 @@ extern crate serde_json;
 
 use serde::{Serialize, Deserialize};
 
-use chrono::{Datelike, Timelike, NaiveDate, NaiveDateTime};
+use chrono::{Datelike, Timelike, NaiveDate};
 
 use std::str::FromStr;
 use std::iter::Iterator;
@@ -40,7 +40,7 @@ pub struct StatemapDescription {
     description: String,                    // description of entity
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 #[serde(deny_unknown_fields)]
 pub struct StatemapMetadata {
@@ -84,7 +84,7 @@ where
 pub struct Statemap {
     metadata: StatemapMetadata,
     state_data: HashMap<String, LinkedList<StatemapDatum>>,
-    first_state: Option<NaiveDateTime>,
+    first_state: Option<u64>,
 }
 
 /*
@@ -167,14 +167,12 @@ impl Statemap {
         let day = datetime.day();
 
         let time = NaiveDate::from_ymd(yr, mon, day).and_hms(hr, min, sec);
-
-        if self.first_state.is_none() || self.first_state.unwrap() > time {
-            self.first_state = Some(time);
-        }
-
-        let mut ts: u64 = 
-            (self.first_state.unwrap().timestamp() * 1_000_000_000) as u64;
+        let mut ts: u64 = (time.timestamp() as u64)* 1_000_000_000;
         ts += ns;
+
+        if self.first_state.is_none() || self.first_state.unwrap() > ts {
+            self.first_state = Some(ts);
+        }
 
         let datum = StatemapDatum {
             time: ts,
@@ -202,6 +200,8 @@ impl Statemap {
  *
  */
 pub struct IterHelper {
+    header: StatemapMetadata,
+    first_state: Option<u64>,
     entity_iter: std::collections::hash_map::IntoIter<String, LinkedList<StatemapDatum>>,
     entity_data: Option<(String, LinkedList<StatemapDatum>)>,
 }
@@ -212,8 +212,19 @@ impl Iterator for IterHelper {
     fn next(&mut self) -> Option<Self::Item> {
         let mut ret = None;
 
+        /*
+         * The beginning of the iterator prints the statemap header data.
+         *
+         * We need to make sure the header is configured with the correct
+         * start time before returning the formatted JSON.
+         */
         if self.entity_data.is_none() {
             self.entity_data = self.entity_iter.next();
+
+            /*
+             * XXX add start time stamps.
+             */
+            return Some(serde_json::to_string(&self.header).unwrap())
         }
 
         /*
@@ -237,7 +248,11 @@ impl Iterator for IterHelper {
         loop {
             if let Some((_, statelist)) = &mut self.entity_data {
                 ret = match statelist.pop_front() {
-                    Some(state) => Some(serde_json::to_string(&state).unwrap()),
+                    Some(mut state) => {
+                        state.time -= self.first_state.unwrap();
+
+                        Some(serde_json::to_string(&state).unwrap())
+                    },
                     None => None,
                 }
             }
@@ -265,6 +280,8 @@ impl IntoIterator for Statemap {
 
     fn into_iter(self) -> Self::IntoIter {
         IterHelper {
+            header: self.metadata,
+            first_state: self.first_state,
             entity_iter: self.state_data.into_iter(),
             entity_data: None,
         }
