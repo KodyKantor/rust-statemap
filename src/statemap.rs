@@ -11,6 +11,7 @@ use std::iter::Iterator;
 use std::iter::IntoIterator;
 
 use std::collections::{HashMap, LinkedList};
+use std::collections::hash_map::IntoIter;
 
 /*
  * The Statemap* types denote the structure of the JSON that statemap expects.
@@ -27,6 +28,7 @@ pub struct StatemapState {
 #[serde(deny_unknown_fields)]
 pub struct StatemapDatum {
     #[serde(deserialize_with = "datum_time_from_string")]
+    #[serde(serialize_with = "datum_string_from_time")]
     time: u64,                              // time of this datum
     entity: String,                         // name of entity
     state: u32,                             // state entity is in at time
@@ -81,6 +83,19 @@ where
     }
 }
 
+/*
+ * The opposite of datum_time_from_string, this function changes the given u64
+ * timestamp into a string so it can be stored in JSON (which can't hold 64 bit
+ * numbers natively).
+ */
+fn datum_string_from_time<S>(time: &u64, serializer: S)
+    -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&format!("{}", time))
+}
+
 pub struct Statemap {
     metadata: StatemapMetadata,
     state_data: HashMap<String, LinkedList<StatemapDatum>>,
@@ -88,14 +103,6 @@ pub struct Statemap {
 }
 
 /*
- * TODO
- * - during first iteration step:
- *   - update header to include start time data.
- *   - print out the statemap header.
- *   - modify states in-flight to include time offset from beginning of
- *     statemap.
- *   - add tests.
- *
  * Consumers of Statemap will use an iterator to pull the state information out
  * of this library. The iterator consumes the Statemap struct.
  *
@@ -117,13 +124,13 @@ pub struct Statemap {
  *
  */
 impl Statemap {
-    pub fn new(title: String, host: Option<String>, entity_kind: Option<String>)
+    pub fn new(title: &str, host: Option<String>, entity_kind: Option<String>)
         -> Statemap {
 
         Statemap {
             metadata: StatemapMetadata {
                 start: Vec::new(),
-                title,
+                title: title.to_owned(),
                 host,
                 entityKind: entity_kind,
                 states: HashMap::new(),
@@ -145,14 +152,22 @@ impl Statemap {
      * implementation. Hopefully users are aware of the UTC recommendation, or
      * don't care if wall clock times aren't accurate.
      */
-    pub fn set_state<D>(&mut self, entity_name: String, state_name: String,
-        tag: Option<String>, datetime: D)
-        where D: Datelike + Timelike,
+    pub fn set_state<D>(&mut self, entity_name: &str, state_name: &str,
+        tag: Option<&str>, datetime: D)
+    where
+        D: Datelike + Timelike,
     {
+
+        let ename = entity_name.to_owned();
+        let sname = state_name.to_owned();
+        let mut t: Option<String> = None;
+        if tag.is_some() {
+            t = Some(tag.unwrap().to_owned());
+        }
 
         let len = self.metadata.states.len();
         let state = self.metadata.states
-            .entry(state_name)
+            .entry(sname)
             .or_insert(StatemapState {
                 color: None,
                 value: len,
@@ -176,13 +191,13 @@ impl Statemap {
 
         let datum = StatemapDatum {
             time: ts,
-            entity: entity_name.clone(),
+            entity: ename.clone(),
             state: state.value as u32,
-            tag,
+            tag: t,
         };
 
         self.state_data
-            .entry(entity_name)
+            .entry(ename)
             .and_modify(|e| e.push_back(datum.clone()))
             .or_insert_with(|| {
                 let mut list = LinkedList::new();
@@ -202,8 +217,26 @@ impl Statemap {
 pub struct IterHelper {
     header: StatemapMetadata,
     first_state: Option<u64>,
-    entity_iter: std::collections::hash_map::IntoIter<String, LinkedList<StatemapDatum>>,
+    entity_iter: IntoIter<String, LinkedList<StatemapDatum>>,
     entity_data: Option<(String, LinkedList<StatemapDatum>)>,
+}
+
+impl IterHelper {
+    /*
+     * Statemaps require a header that includes a start time array. The array
+     * must have two elements.
+     *   start[0] -> Seconds since Unix epoch in UTC.
+     *   start[1] -> Nanosecond offset within the time defined by start[0].
+     */
+    fn update_header(&mut self) {
+        let sec = self.first_state.unwrap() / 1_000_000_000;
+        let ns = self.first_state.unwrap() % 1_000_000_000;
+
+        /*
+         * Replace the vec in the header with the new start time.
+         */
+        self.header.start = vec![sec, ns];
+    }
 }
 
 impl Iterator for IterHelper {
@@ -221,9 +254,7 @@ impl Iterator for IterHelper {
         if self.entity_data.is_none() {
             self.entity_data = self.entity_iter.next();
 
-            /*
-             * XXX add start time stamps.
-             */
+            self.update_header();
             return Some(serde_json::to_string(&self.header).unwrap())
         }
 

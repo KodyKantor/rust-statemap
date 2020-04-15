@@ -8,11 +8,19 @@ use statemap::*;
 
 fn main() {
 
-    let mut sm = Statemap::new("test".to_owned(), None, None);
-    sm.set_state("my_host".to_owned(), "test0".to_owned(), None, Utc::now());
-    sm.set_state("other_host".to_owned(), "test0".to_owned(), None, Utc::now());
-    sm.set_state("other_host".to_owned(), "test1".to_owned(), None, Utc::now());
-    sm.set_state("other_host".to_owned(), "test1".to_owned(), None, Utc::now());
+    let h1 = "host1";
+    let h2 = "host2";
+
+    let s1 = "state1";
+    let s2 = "state2";
+    let s3 = "state3";
+
+    let mut sm = Statemap::new("test", None, None);
+    sm.set_state(h1, s1, None, Utc::now());
+    sm.set_state(h2, s1, None, Utc::now());
+    sm.set_state(h1, s2, None, Utc::now());
+    sm.set_state(h2, s2, None, Utc::now());
+    sm.set_state(h1, s3, None, Utc::now());
 
     for state in sm {
         println!("{}", state);
