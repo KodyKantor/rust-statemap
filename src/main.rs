@@ -17,6 +17,10 @@ fn main() {
     sm.set_state(h2, s2, None, Utc::now());
     sm.set_state(h1, s3, None, Utc::now());
 
+    sm.set_state_color("state1", "blue");
+    sm.set_state_color("state2", "red");
+    sm.set_state_color("state10", "green");
+
     for state in sm {
         println!("{}", state);
     }

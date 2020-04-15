@@ -142,6 +142,34 @@ impl Statemap {
     }
 
     /*
+     * Allow the user to specify a color for a given state. The statemap tool
+     * has a lot of flexibility here. For now we'll just try to verify that the
+     * color the user passes in can be parsed as a 'named' color.
+     *
+     * XXX: Move the color parsing code from statemap to this library.
+     *
+     * If the state does not exist it is added to the statemap metadata with
+     * the given color.
+     */
+    pub fn set_state_color(&mut self, state_name: &str, color: &str) {
+
+        /*
+         * Verify that this is a valid color.
+         * Throw away the result because this is stored as a String.
+         */
+        palette::named::from_str(color).expect("unknown color");
+
+        let len = self.metadata.states.len();
+        self.metadata.states
+            .entry(state_name.to_owned())
+            .and_modify(|e| e.color = Some(color.to_owned()))
+            .or_insert(StatemapState {
+                color: Some(color.to_owned()),
+                value: len,
+            });
+    }
+
+    /*
      * Sets the given entity to the given state.
      *
      * If the given state is not already registered in the statemap metadata it
