@@ -88,6 +88,7 @@ where
  * timestamp into a string so it can be stored in JSON (which can't hold 64 bit
  * numbers natively).
  */
+#[allow(clippy::trivially_copy_pass_by_ref)] /* Needed for serde API. */
 fn datum_string_from_time<S>(time: &u64, serializer: S)
     -> Result<S::Ok, S::Error>
 where
@@ -161,8 +162,9 @@ impl Statemap {
         let ename = entity_name.to_owned();
         let sname = state_name.to_owned();
         let mut t: Option<String> = None;
-        if tag.is_some() {
-            t = Some(tag.unwrap().to_owned());
+
+        if let Some(x) = tag {
+            t = Some(x.to_owned());
         }
 
         let len = self.metadata.states.len();

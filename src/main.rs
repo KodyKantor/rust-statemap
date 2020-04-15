@@ -1,10 +1,5 @@
-extern crate serde_json;
-
-mod statemap;
-
+extern crate statemap;
 use chrono::Utc;
-
-use statemap::*;
 
 fn main() {
 
@@ -15,7 +10,7 @@ fn main() {
     let s2 = "state2";
     let s3 = "state3";
 
-    let mut sm = Statemap::new("test", None, None);
+    let mut sm = statemap::Statemap::new("test", None, None);
     sm.set_state(h1, s1, None, Utc::now());
     sm.set_state(h2, s1, None, Utc::now());
     sm.set_state(h1, s2, None, Utc::now());

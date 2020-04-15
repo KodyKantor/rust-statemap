@@ -1,5 +1,5 @@
 [package]
-name = "rust-statemap"
+name = "statemap"
 version = "0.1.0"
 authors = ["Kody A Kantor <kody@kkantor.com>"]
 edition = "2018"
